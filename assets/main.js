@@ -172,13 +172,13 @@
       retry.href = api + "/download" + (src ? "?src=" + encodeURIComponent(src.toLowerCase()) : "");
     }
   }
-  // Arrived from "Yes, download it": start the download and show the install steps.
-  if (retry && /[?&]go=1/.test(location.search)) {
+  // Arrived just after clicking Download: the file is already downloading (it started from the click itself,
+  // which browsers always allow); show "downloading" and the install steps.
+  if (retry && /[?&](go|started)=1/.test(location.search)) {
     var started = document.getElementById("dl-started"), ready = document.getElementById("dl-ready");
     if (started) started.hidden = false;
     if (ready) ready.hidden = true;
     Array.prototype.forEach.call(document.querySelectorAll(".dl-retry"), function (a) { a.href = retry.href; });
-    setTimeout(function () { retry.click(); }, 500);
     // Then glide down to the install steps.
     setTimeout(function () {
       var steps = document.getElementById("install");
@@ -190,6 +190,7 @@
   // Every "Download" button asks first: "Download GlassDrive Beta?" Yes → the download page,
   // which starts the download and walks through installing it.
   var size = (document.querySelector('meta[name="gd-download-size"]') || {}).content || "";
+  var fileURL = retry ? retry.getAttribute("href") : "downloads/GlassDrive-Beta.dmg";
   var dialog = null;
   var openDialog = function () {
     if (!dialog) {
@@ -202,10 +203,12 @@
         '<h2 id="dl-q">Download GlassDrive Beta?</h2>' +
         "<p>GlassDrive-Beta.dmg" + (size ? " · " + size : "") + " · for macOS 14 Sonoma or later. Free during the beta.</p>" +
         '<div class="actions"><button class="btn secondary" value="no">Not now</button>' +
-        '<button class="btn" value="yes" autofocus>Download</button></div></form>';
+        '<a class="btn" id="dl-yes" href="' + fileURL + '" download autofocus>Download</a></div></form>';
       document.body.appendChild(dialog);
-      dialog.addEventListener("close", function () {
-        if (dialog.returnValue === "yes") location.href = "download.html?go=1";
+      // A real link, so the browser downloads straight from the click; then show how to install it.
+      dialog.querySelector("#dl-yes").addEventListener("click", function () {
+        dialog.close("yes");
+        setTimeout(function () { location.href = "download.html?started=1#install"; }, 700);
       });
       dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close("no"); }); // click outside
     }
@@ -220,12 +223,13 @@
         openDialog();
       });
     });
-    // On the download page itself, the big button asks too.
-    if (retry && !/[?&]go=1/.test(location.search)) {
-      retry.addEventListener("click", function (e) {
-        if (retry.dataset.confirmed) return;
-        e.preventDefault();
-        openDialog();
+    // On the download page itself the big button is already a direct download link: just show the steps too.
+    if (retry) {
+      retry.addEventListener("click", function () {
+        var started = document.getElementById("dl-started"), ready = document.getElementById("dl-ready");
+        if (started) started.hidden = false;
+        if (ready) ready.hidden = true;
+        setTimeout(function () { var s = document.getElementById("install"); if (s) s.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }); }, 900);
       });
     }
   }
