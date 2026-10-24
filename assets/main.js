@@ -174,64 +174,45 @@
   }
   // Arrived just after clicking Download: the file is already downloading (it started from the click itself,
   // which browsers always allow); show "downloading" and the install steps.
-  if (retry && /[?&](go|started)=1/.test(location.search)) {
-    var started = document.getElementById("dl-started"), ready = document.getElementById("dl-ready");
-    if (started) started.hidden = false;
-    if (ready) ready.hidden = true;
-    Array.prototype.forEach.call(document.querySelectorAll(".dl-retry"), function (a) { a.href = retry.href; });
-    // Then glide down to the install steps.
-    setTimeout(function () {
-      var steps = document.getElementById("install");
-      if (steps) steps.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-    }, 1400);
-    if (history.replaceState) history.replaceState(null, "", location.pathname + "#install"); // a refresh won't download twice
+  if (retry && /[?&](go|started)=1/.test(location.search)) { // old links from before: just show the steps
+    setTimeout(function () { var st = document.getElementById("install"); if (st) st.scrollIntoView({ block: "start" }); }, 300);
   }
 
-  // Every "Download" button asks first: "Download GlassDrive Beta?" Yes → the download page,
-  // which starts the download and walks through installing it.
-  var size = (document.querySelector('meta[name="gd-download-size"]') || {}).content || "";
-  var fileURL = retry ? retry.getAttribute("href") : "downloads/GlassDrive-Beta.dmg";
-  var dialog = null;
-  var openDialog = function () {
-    if (!dialog) {
-      dialog = document.createElement("dialog");
-      dialog.className = "dl-dialog";
-      dialog.setAttribute("aria-labelledby", "dl-q");
-      var icon = document.querySelector(".app-icon, .mini-icon");
-      dialog.innerHTML = '<form method="dialog" class="inner">' +
-        '<div class="app-icon">' + (icon ? icon.innerHTML : "") + "</div>" +
-        '<h2 id="dl-q">Download GlassDrive Beta?</h2>' +
-        "<p>GlassDrive-Beta.dmg" + (size ? " · " + size : "") + " · for macOS 14 Sonoma or later. Free during the beta.</p>" +
-        '<div class="actions"><button class="btn secondary" value="no">Not now</button>' +
-        '<a class="btn" id="dl-yes" href="' + fileURL + '" download autofocus>Download</a></div></form>';
-      document.body.appendChild(dialog);
-      // A real link, so the browser downloads straight from the click; then show how to install it.
-      dialog.querySelector("#dl-yes").addEventListener("click", function () {
-        dialog.close("yes");
-        setTimeout(function () { location.href = "download.html?started=1#install"; }, 700);
-      });
-      dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close("no"); }); // click outside
-    }
-    dialog.returnValue = "";
-    dialog.showModal();
+  // Every Download button is a plain link to the .dmg (it works with no JavaScript at all).
+  // After the click we only *add* help: a small "Downloading…" card with what browsers may ask
+  // and a link to the install steps. Nothing here stops or replaces the download itself.
+  var help = function () {
+    var isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+    var isChrome = /chrome|crios|edg/i.test(navigator.userAgent);
+    return isSafari ? "If Safari asks “Do you want to allow downloads?”, click <strong>Allow</strong>."
+      : isChrome ? "If Chrome says the file “isn't commonly downloaded”, click <strong>Keep</strong> (it's new, so Chrome hasn't seen it much yet)."
+      : "If your browser asks whether to keep or allow the file, choose <strong>Keep</strong> or <strong>Allow</strong>.";
   };
-  if (typeof HTMLDialogElement === "function") {
-    Array.prototype.forEach.call(document.querySelectorAll('a[href="download.html"]'), function (a) {
-      a.addEventListener("click", function (e) {
-        if (e.metaKey || e.ctrlKey || e.shiftKey) return; // opening in a new tab: just go
-        e.preventDefault();
-        openDialog();
-      });
-    });
-    // On the download page itself the big button is already a direct download link: just show the steps too.
-    if (retry) {
-      retry.addEventListener("click", function () {
-        var started = document.getElementById("dl-started"), ready = document.getElementById("dl-ready");
-        if (started) started.hidden = false;
-        if (ready) ready.hidden = true;
-        setTimeout(function () { var s = document.getElementById("install"); if (s) s.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }); }, 900);
-      });
+  var toast = null;
+  var showToast = function () {
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.className = "dl-toast";
+      toast.setAttribute("role", "status");
+      document.body.appendChild(toast);
     }
+    toast.innerHTML = "<strong>Downloading GlassDrive-Beta.dmg…</strong><span>" + help() + "</span>" +
+      '<a class="btn" href="download.html#install">How to install it</a>' +
+      '<button type="button" aria-label="Close">×</button>';
+    toast.querySelector("button").onclick = function () { toast.hidden = true; };
+    toast.hidden = false;
+  };
+  Array.prototype.forEach.call(document.querySelectorAll("a[data-dl]"), function (a) {
+    a.addEventListener("click", function () { setTimeout(showToast, 150); });
+  });
+  // On the download page, the big button reveals the install steps underneath.
+  if (retry) {
+    retry.addEventListener("click", function () {
+      var started = document.getElementById("dl-started"), note = document.getElementById("dl-help");
+      if (started) started.hidden = false;
+      if (note) { note.innerHTML = help(); note.hidden = false; }
+      setTimeout(function () { var st = document.getElementById("install"); if (st) st.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }); }, 1200);
+    });
   }
 
   Array.prototype.forEach.call(document.querySelectorAll(".year"), function (el) { el.textContent = new Date().getFullYear(); });
